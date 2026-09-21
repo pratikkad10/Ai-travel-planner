@@ -101,7 +101,7 @@ export function App() {
               Service Offline
             </p>
             <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-              AI backend is unreachable at localhost:8000
+              AI backend is unreachable. Please check connection.
             </p>
           </div>
         </div>
