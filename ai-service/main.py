@@ -24,6 +24,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "https://ai-travel-planner-xi-rust.vercel.app",
+        "https://ai-travel-planner-kvfap6sf9-pratikkad10s-projects.vercel.app"
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
@@ -126,4 +127,4 @@ async def chat_stream_endpoint(request: ChatRequest):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
+
