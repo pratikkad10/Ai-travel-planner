@@ -56,8 +56,11 @@ pip install -r requirements.txt
 
 Create a `.env` file inside `ai-service/`:
 ```env
-MISTRAL_API_KEY=your_mistral_api_key_here
-TAVILY_API_KEY=your_tavily_api_key_here
+MISTRAL_API_KEY=your_mistral_api_key
+TAVILY_API_KEY=your_tavily_api_key
+LANGSMITH_API_KEY=your_langsmith_api_key
+FLIGHT_MCP_API_KEY=your_flight_mcp_api_key
+GEOAPIFY_API_KEY=your_geoapify_api_key
 ```
 
 Start the FastAPI server:
@@ -100,7 +103,12 @@ Open `http://localhost:5173` in your browser.
 - **Backend (FastAPI)**: Deploy to [Railway.app](https://railway.app)
   - Root directory: `/ai-service`
   - Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-  - Add `MISTRAL_API_KEY` and `TAVILY_API_KEY` to Environment Variables.
+  - Add required environment variables in Railway settings:
+    - `MISTRAL_API_KEY`
+    - `TAVILY_API_KEY`
+    - `LANGSMITH_API_KEY`
+    - `FLIGHT_MCP_API_KEY`
+    - `GEOAPIFY_API_KEY`
 - **Frontend (Vite)**: Deploy to [Vercel](https://vercel.com)
   - Root directory: `frontend`
   - Build command: `npm run build`
