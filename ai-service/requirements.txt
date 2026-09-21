@@ -1,0 +1,12 @@
+langchain
+langchain-community
+langchain-mistralai
+tavily-python
+# Web scraping
+beautifulsoup4
+# Web scraping
+requests
+python-dotenv
+rich
+fastapi
+uvicorn[standard]
