@@ -19,7 +19,7 @@ const SAMPLE_PROMPTS: QuickPromptItem[] = [
     title: "Goa 4-Day Trip",
     tag: "Beach & Flights",
     prompt:
-      "Find flights from BOM to GOI and plan a 4-day beach vacation in Goa with hotel options, food spots, and attractions.",
+      "Find flights from Mumbai to Goa and plan a 4-day beach vacation in Goa with hotel options, food spots, and attractions.",
   },
   {
     id: "paris-itinerary",
