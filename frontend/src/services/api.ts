@@ -1,11 +1,24 @@
 import type { ChatRequest, ChatResponse } from "@/types/travel"
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+).replace(/\/+$/, "")
 
 export async function checkHealth(): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE_URL}/health`)
-    return res.ok
+    // /api/status avoids Brave Shields and standard adblock telemetry filter lists
+    const res = await fetch(`${API_BASE_URL}/api/status`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    })
+    if (res.ok) return true
+
+    // Fallback to /health in case the backend hasn't redeployed yet
+    if (res.status === 404) {
+      const fallback = await fetch(`${API_BASE_URL}/health`)
+      return fallback.ok
+    }
+    return false
   } catch {
     return false
   }

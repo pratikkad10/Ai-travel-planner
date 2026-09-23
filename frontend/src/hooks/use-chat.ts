@@ -64,13 +64,28 @@ export function useChat() {
     }
   }, [sessions])
 
-  // Periodic health check
+  // Periodic health check with cold-start tolerance
   useEffect(() => {
     let mounted = true
+    let consecutiveFailures = 0
+
     const verifyHealth = async () => {
       const online = await checkHealth()
-      if (mounted) setIsBackendOnline(online)
+      if (!mounted) return
+
+      if (online) {
+        consecutiveFailures = 0
+        setIsBackendOnline(true)
+      } else {
+        consecutiveFailures += 1
+        // Render free tier can take 30-40s on cold starts.
+        // Require 2 consecutive failed health checks before showing "Offline" banner
+        if (consecutiveFailures >= 2) {
+          setIsBackendOnline(false)
+        }
+      }
     }
+
     verifyHealth()
     const interval = setInterval(verifyHealth, 15000)
     return () => {

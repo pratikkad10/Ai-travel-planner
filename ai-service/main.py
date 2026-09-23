@@ -89,6 +89,8 @@ def record_clarification_turn(thread_id: str, user_text: str, clarification: str
 
 
 @app.get("/health")
+@app.get("/api/status")
+@app.get("/api/health")
 def health_check():
     return {"status": "ok"}
 
