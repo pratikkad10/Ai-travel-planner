@@ -1,6 +1,7 @@
-import { Compass, Plus, PanelLeft, Sun, Moon } from "lucide-react"
+import { Compass, Plus, PanelLeft, Sun, Moon, Menu } from "lucide-react"
 
 interface HeaderProps {
+  isSidebarOpen?: boolean
   theme: "light" | "dark"
   onToggleTheme: () => void
   onNewTrip: () => void
@@ -9,6 +10,7 @@ interface HeaderProps {
 }
 
 export function Header({
+  isSidebarOpen,
   theme,
   onToggleTheme,
   onNewTrip,
@@ -23,11 +25,13 @@ export function Header({
           <button
             type="button"
             onClick={onToggleSidebar}
-            aria-label="Toggle trip history sidebar"
-            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 active:scale-95 dark:text-zinc-400 dark:hover:bg-[#242424] dark:hover:text-white"
-            title="Toggle Trip History"
+            aria-label={isSidebarOpen ? "Close trip history sidebar" : "Open trip history sidebar"}
+            aria-expanded={isSidebarOpen}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 active:scale-95 dark:border-[#282828] dark:bg-[#242424] dark:text-zinc-300 dark:hover:bg-[#2e2e2e] dark:hover:text-white"
+            title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
-            <PanelLeft className="h-4 w-4" />
+            <Menu className="h-4.5 w-4.5 lg:hidden" />
+            <PanelLeft className="hidden h-4 w-4 lg:block" />
           </button>
 
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white shadow-2xs dark:bg-[#242424] dark:text-white">

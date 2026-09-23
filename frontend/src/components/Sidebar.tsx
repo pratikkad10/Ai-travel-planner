@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { Plus, Trash2, X, Compass, Clock } from "lucide-react"
 import type { TravelSession } from "@/types/travel"
 
@@ -35,6 +36,16 @@ export function Sidebar({
   onDeleteSession,
   onNewTrip,
 }: SidebarProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isOpen, onClose])
+
   return (
     <>
       {/* Mobile backdrop */}
@@ -48,8 +59,12 @@ export function Sidebar({
 
       {/* Sidebar Panel */}
       <aside
+        aria-hidden={!isOpen}
+        aria-label="Trip history sidebar"
         className={`fixed inset-y-0 left-0 z-40 flex w-72 sm:w-80 flex-col border-r border-slate-200/90 bg-white shadow-lg transition-transform duration-200 ease-in-out dark:border-[#282828] dark:bg-[#121212] lg:static lg:z-auto lg:shadow-none ${
-          isOpen ? "translate-x-0" : "-translate-x-full lg:hidden"
+          isOpen
+            ? "translate-x-0 pointer-events-auto"
+            : "-translate-x-full pointer-events-none lg:hidden"
         }`}
       >
         {/* Header */}
@@ -65,7 +80,7 @@ export function Sidebar({
             type="button"
             onClick={onClose}
             aria-label="Close sidebar"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-[#242424] dark:hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-[#242424] dark:hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>

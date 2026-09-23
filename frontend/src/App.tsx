@@ -8,7 +8,26 @@ import { QuickPrompts } from "@/components/QuickPrompts"
 import { ChatInput } from "@/components/ChatInput"
 
 export function App() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 1024
+    }
+    return false
+  })
+
+  // Synchronize sidebar default state if screen resizes across the mobile/desktop breakpoint
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const mediaQuery = window.matchMedia("(min-width: 1024px)")
+    const handleMediaChange = (e: MediaQueryListEvent) => {
+      setIsSidebarOpen(e.matches)
+    }
+
+    mediaQuery.addEventListener("change", handleMediaChange)
+    return () => mediaQuery.removeEventListener("change", handleMediaChange)
+  }, [])
+
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("travel_planner_theme")
@@ -64,6 +83,7 @@ export function App() {
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Navigation */}
         <Header
+          isSidebarOpen={isSidebarOpen}
           theme={theme}
           onToggleTheme={toggleTheme}
           onNewTrip={startNewTrip}

@@ -147,21 +147,29 @@ def format_flightapi_response(
             or (leg.get("marketing_carrier_ids", [None])[0] if leg.get("marketing_carrier_ids") else None)
         )
 
-        airline_name = "Unknown Airline"
+        airline_name = ""
         carrier_code = ""
 
         if carrier_id is not None:
             carrier = carriers_lookup.get(str(carrier_id), {})
             if carrier:
-                airline_name = carrier.get("name") or carrier.get("alt_id") or airline_name
-                carrier_code = carrier.get("display_code") or carrier.get("iata") or ""
+                carrier_code = (carrier.get("display_code") or carrier.get("iata") or "").upper().strip()
+                airline_name = carrier.get("name") or carrier.get("alt_id") or ""
 
-        # Flight number
-        flight_num_raw = first_segment.get("marketing_flight_number") or ""
+        # Enhance with readable airline names from directory
+        if carrier_code in AIRLINE_DIRECTORY:
+            airline_name = AIRLINE_DIRECTORY[carrier_code]
+        elif airline_name in AIRLINE_DIRECTORY:
+            airline_name = AIRLINE_DIRECTORY[airline_name]
+        elif not airline_name:
+            airline_name = carrier_code or "Commercial Airline"
+
+        # Flight number (e.g., "6E 204" or "AI 101")
+        flight_num_raw = str(first_segment.get("marketing_flight_number") or "").strip()
         if carrier_code and flight_num_raw:
             flight_number = f"{carrier_code} {flight_num_raw}".strip()
         elif flight_num_raw:
-            flight_number = str(flight_num_raw)
+            flight_number = flight_num_raw
         elif carrier_code:
             flight_number = carrier_code
         else:
@@ -180,26 +188,42 @@ def format_flightapi_response(
         else:
             stops = 0
 
+        origin_city_name = AIRPORT_CITIES.get(origin_code, origin_code)
+        destination_city_name = AIRPORT_CITIES.get(destination_code, destination_code)
+
         offers.append({
             "airline": airline_name,
             "flight_number": flight_number,
+            "origin": f"{origin_city_name} ({origin_code})",
+            "destination": f"{destination_city_name} ({destination_code})",
             "price": round(min_price, 2),
             "currency": currency.upper(),
             "departure": departure_time,
+            "departure_time": _format_time(departure_time),
             "arrival": arrival_time,
+            "arrival_time": _format_time(arrival_time),
             "duration_minutes": duration_minutes,
+            "duration": _format_duration(duration_minutes),
             "stops": stops,
+            "stops_text": "Non-stop (Direct)" if stops == 0 else (f"{stops} stop" if stops == 1 else f"{stops} stops"),
             "cabin": cabin_class,
             "booking_link": booking_url,
         })
 
-    # Sort offers by lowest price first
-    offers.sort(key=lambda x: x["price"] if x["price"] > 0 else float("inf"))
+    # Sort offers: Prioritize Non-stop (0 stops) flights first, then sort by price ascending
+    offers.sort(key=lambda x: (x["stops"], x["price"] if x["price"] > 0 else float("inf")))
+
+    origin_city_name = AIRPORT_CITIES.get(origin_code, origin_code)
+    destination_city_name = AIRPORT_CITIES.get(destination_code, destination_code)
 
     return {
         "success": True,
-        "origin": origin_code,
-        "destination": destination_code,
+        "origin": f"{origin_city_name} ({origin_code})",
+        "destination": f"{destination_city_name} ({destination_code})",
+        "origin_city": origin_city_name,
+        "destination_city": destination_city_name,
+        "origin_code": origin_code,
+        "destination_code": destination_code,
         "departure_date": departure_date,
         "adults": adults,
         "cabin": cabin_class,
@@ -211,6 +235,144 @@ def format_flightapi_response(
 
 # Backward compatibility alias
 format_flight_response = format_flightapi_response
+
+
+def _format_time(iso_time_str: str | None) -> str:
+    """Format ISO time (e.g. '2026-10-15T06:15:00') into 12-hour format '06:15 AM'."""
+    if not iso_time_str:
+        return "N/A"
+    try:
+        if "T" in iso_time_str:
+            time_part = iso_time_str.split("T")[1][:5]
+            hour, minute = map(int, time_part.split(":"))
+            suffix = "AM" if hour < 12 else "PM"
+            hour12 = hour % 12
+            if hour12 == 0:
+                hour12 = 12
+            return f"{hour12:02d}:{minute:02d} {suffix}"
+    except Exception:
+        pass
+    return str(iso_time_str)
+
+
+def _format_duration(duration_minutes: int | None) -> str:
+    """Format minutes into human-readable '1h 15m' format."""
+    if not duration_minutes:
+        return "N/A"
+    try:
+        hours = duration_minutes // 60
+        mins = duration_minutes % 60
+        if hours > 0 and mins > 0:
+            return f"{hours}h {mins}m"
+        elif hours > 0:
+            return f"{hours}h"
+        else:
+            return f"{mins}m"
+    except Exception:
+        return f"{duration_minutes} min"
+
+
+AIRLINE_DIRECTORY = {
+    # Indian Domestic Carriers
+    "6E": "IndiGo",
+    "AI": "Air India",
+    "IX": "Air India Express",
+    "I5": "AIX Connect",
+    "SG": "SpiceJet",
+    "QP": "Akasa Air",
+    "UK": "Vistara",
+    "G8": "Go First",
+    "S5": "Star Air",
+    "9I": "Alliance Air",
+    # Middle East Carriers
+    "EK": "Emirates",
+    "EY": "Etihad Airways",
+    "QR": "Qatar Airways",
+    "FZ": "flydubai",
+    "G9": "Air Arabia",
+    "WY": "Oman Air",
+    "GF": "Gulf Air",
+    "KU": "Kuwait Airways",
+    "J9": "Jazeera Airways",
+    "SV": "Saudia",
+    # European & American Carriers
+    "BA": "British Airways",
+    "LH": "Lufthansa",
+    "AF": "Air France",
+    "KL": "KLM Royal Dutch Airlines",
+    "KLM": "KLM Royal Dutch Airlines",
+    "VS": "Virgin Atlantic",
+    "LX": "Swiss International Air Lines",
+    "TK": "Turkish Airlines",
+    "UA": "United Airlines",
+    "DL": "Delta Air Lines",
+    "AA": "American Airlines",
+    # Southeast Asian & Asian Carriers
+    "SQ": "Singapore Airlines",
+    "TR": "Scoot",
+    "TG": "Thai Airways",
+    "MH": "Malaysia Airlines",
+    "AK": "AirAsia",
+    "FD": "Thai AirAsia",
+    "CX": "Cathay Pacific",
+    "JL": "Japan Airlines",
+    "NH": "All Nippon Airways (ANA)",
+    "UL": "SriLankan Airlines",
+}
+
+
+AIRPORT_CITIES = {
+    "BOM": "Mumbai",
+    "DEL": "Delhi",
+    "GOI": "Goa (Dabolim)",
+    "GOX": "Goa (Mopa)",
+    "BLR": "Bangalore",
+    "PNQ": "Pune",
+    "HYD": "Hyderabad",
+    "MAA": "Chennai",
+    "CCU": "Kolkata",
+    "AMD": "Ahmedabad",
+    "JAI": "Jaipur",
+    "COK": "Kochi",
+    "TRV": "Thiruvananthapuram",
+    "LKO": "Lucknow",
+    "VNS": "Varanasi",
+    "IXC": "Chandigarh",
+    "ATQ": "Amritsar",
+    "SXR": "Srinagar",
+    "UDR": "Udaipur",
+    "PAT": "Patna",
+    "GAU": "Guwahati",
+    "IDR": "Indore",
+    "BHO": "Bhopal",
+    "STV": "Surat",
+    "NAG": "Nagpur",
+    "VTZ": "Visakhapatnam",
+    "IXE": "Mangalore",
+    "CJB": "Coimbatore",
+    "IXM": "Madurai",
+    "IXB": "Bagdogra",
+    "IXR": "Ranchi",
+    "BDQ": "Vadodara",
+    "DED": "Dehradun",
+    "JDH": "Jodhpur",
+    "JSA": "Jaisalmer",
+    "DXB": "Dubai",
+    "AUH": "Abu Dhabi",
+    "DOH": "Doha",
+    "LHR": "London",
+    "SIN": "Singapore",
+    "BKK": "Bangkok",
+    "JFK": "New York",
+    "SFO": "San Francisco",
+    "CDG": "Paris",
+    "NRT": "Tokyo",
+    "DPS": "Bali",
+    "HKT": "Phuket",
+    "KUL": "Kuala Lumpur",
+    "MLE": "Maldives",
+}
+
 
 IATA_CODES = {
     "mumbai": "BOM",
@@ -266,11 +428,26 @@ IATA_CODES = {
 
 
 def resolve_iata(code_or_city: str) -> str:
-    """Resolve a city name or code to a 3-letter uppercase IATA code."""
+    """
+    Resolve a city name or code to a 3-letter uppercase IATA code.
+    Prioritizes explicit city mapping so 'Goa' maps to 'GOI' (India), not 'GOA' (Genoa, Italy).
+    """
     cleaned = code_or_city.strip()
+    lower_val = cleaned.lower()
+
+    # 1. Top Priority: Check exact city mapping
+    if lower_val in IATA_CODES:
+        return IATA_CODES[lower_val]
+
+    # 2. Critical Safety: "goa" is always Goa, India (GOI)
+    if lower_val == "goa" or cleaned.upper() == "GOA":
+        return "GOI"
+
+    # 3. 3-letter IATA code pass-through
     if len(cleaned) == 3 and cleaned.isalpha():
         return cleaned.upper()
-    return IATA_CODES.get(cleaned.lower(), cleaned.upper())
+
+    return IATA_CODES.get(lower_val, cleaned.upper())
 
 
 @tool
