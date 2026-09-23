@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser
 
 from agent import agent
+from agent.query_optimizer import optimize_user_query
+from langchain_core.messages import HumanMessage, AIMessage
 
 app = FastAPI(
     title="AI Travel Planner API",
@@ -57,6 +59,35 @@ class ChatResponse(BaseModel):
     thread_id: str
 
 
+def get_thread_history(thread_id: str, limit: int = 6) -> str:
+    """Retrieve recent conversation history from the agent's checkpointer."""
+    try:
+        state = agent.get_state({"configurable": {"thread_id": thread_id}})
+        if state and state.values and "messages" in state.values:
+            recent_msgs = state.values["messages"][-limit:]
+            formatted = []
+            for msg in recent_msgs:
+                role = getattr(msg, "type", "message")
+                content = getattr(msg, "content", "")
+                if isinstance(content, str) and content.strip():
+                    formatted.append(f"{role}: {content.strip()}")
+            return "\n".join(formatted)
+    except Exception as e:
+        print(f"Could not load thread history: {e}")
+    return ""
+
+
+def record_clarification_turn(thread_id: str, user_text: str, clarification: str) -> None:
+    """Record user input and assistant clarification question into agent checkpointer state."""
+    try:
+        agent.update_state(
+            {"configurable": {"thread_id": thread_id}},
+            {"messages": [HumanMessage(content=user_text), AIMessage(content=clarification)]},
+        )
+    except Exception as e:
+        print(f"Could not record clarification turn: {e}")
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
@@ -65,12 +96,37 @@ def health_check():
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     try:
+        # 1. Fetch recent history for conversational context
+        history_str = get_thread_history(request.thread_id)
+
+        # 2. Optimize user query using LLM
+        effective_message = request.message
+        try:
+            intent = optimize_user_query(request.message, history=history_str)
+
+            # If critical info (e.g. origin city for flights) is missing, ask for clarification
+            if intent.needs_clarification and intent.clarification_question:
+                record_clarification_turn(
+                    request.thread_id, request.message, intent.clarification_question
+                )
+                return ChatResponse(
+                    response=intent.clarification_question,
+                    thread_id=request.thread_id,
+                )
+
+            if intent.optimized_prompt:
+                effective_message = intent.optimized_prompt
+        except Exception as opt_err:
+            print(f"Query optimization skipped due to error: {opt_err}")
+            effective_message = request.message
+
+        # 3. Invoke agent with optimized query
         result = agent.invoke(
             {
                 "messages": [
                     {
                         "role": "user",
-                        "content": request.message,
+                        "content": effective_message,
                     }
                 ]
             },
@@ -95,13 +151,42 @@ async def chat_endpoint(request: ChatRequest):
 @app.post("/api/chat/stream")
 async def chat_stream_endpoint(request: ChatRequest):
     try:
+        # 1. Fetch recent history for conversational context
+        history_str = get_thread_history(request.thread_id)
+
+        # 2. Optimize user query using LLM
+        effective_message = request.message
+        clarification_response: Optional[str] = None
+
+        try:
+            intent = optimize_user_query(request.message, history=history_str)
+
+            if intent.needs_clarification and intent.clarification_question:
+                clarification_response = intent.clarification_question
+                record_clarification_turn(
+                    request.thread_id, request.message, clarification_response
+                )
+            elif intent.optimized_prompt:
+                effective_message = intent.optimized_prompt
+        except Exception as opt_err:
+            print(f"Query optimization skipped due to error: {opt_err}")
+            effective_message = request.message
+
+        # If a clarification is needed, stream it directly
+        if clarification_response:
+            async def clarification_generator():
+                yield clarification_response
+
+            return StreamingResponse(clarification_generator(), media_type="text/plain")
+
+        # 3. Stream agent response with optimized query
         async def event_generator():
             async for event in agent.astream_events(
                 {
                     "messages": [
                         {
                             "role": "user",
-                            "content": request.message,
+                            "content": effective_message,
                         }
                     ]
                 },
@@ -115,7 +200,6 @@ async def chat_stream_endpoint(request: ChatRequest):
                 if event.get("event") == "on_chat_model_stream":
                     chunk = event.get("data", {}).get("chunk")
                     if chunk:
-                        # Use StrOutputParser to parse streaming chunks properly
                         text = str_output_parser.invoke(chunk)
                         if text:
                             yield text
